@@ -1,0 +1,62 @@
+import pandas as pd
+import numpy as np
+from sklearn.decomposition import PCA
+from sklearn.cluster import KMeans
+from sklearn.metrics import adjusted_rand_score
+import matplotlib.pyplot as plt
+from flexclust import stepFlexclust, relabel, bootFlexclust, histogram
+from flexmix import stepFlexmix, flexmix, getModel
+from scipy.cluster.hierarchy import dendrogram, linkage
+from partykit import ctree
+from vcd import mosaic
+
+# Load data
+mcdonalds = pd.read_csv('mcdonalds.csv')
+
+# Data exploration
+print(mcdonalds.columns)
+print(mcdonalds.shape)
+print(mcdonalds.head(3))
+
+# Data preprocessing
+MD_x = mcdonalds.iloc[:, 1:12].apply(lambda x: (x == "Yes") + 0)
+print(np.round(MD_x.mean(), 2))
+
+# Principal components analysis (PCA)
+pca = PCA()
+MD_pca = pca.fit_transform(MD_x)
+print(pca.explained_variance_ratio_)
+print(pca.singular_values_)
+
+# K-means clustering
+kmeans = KMeans(n_clusters=4, random_state=1234)
+MD_k4 = kmeans.fit_predict(MD_x)
+print(MD_k4)
+
+# Visualizations
+plt.scatter(MD_pca[:, 0], MD_pca[:, 1], c=MD_k4, cmap='viridis')
+plt.xlabel("Principal Component 1")
+plt.ylabel("Principal Component 2")
+plt.show()
+
+# Mosaic plot
+mosaic(np.array([MD_k4, mcdonalds['Like']]).T)
+plt.xlabel("Segment number")
+plt.show()
+
+# Conditional inference tree
+tree = ctree("factor(k4 == 3) ~ Like.n + Age + VisitFrequency + Gender", data=mcdonalds)
+print(tree)
+
+# Additional analyses and visualizations
+visit = mcdonalds.groupby(MD_k4)['VisitFrequency'].mean()
+like = mcdonalds.groupby(MD_k4)['Like.n'].mean()
+female = mcdonalds.groupby(MD_k4)['Gender'].apply(lambda x: np.mean(x == 'Female'))
+plt.scatter(visit, like, c=MD_k4, s=10 * female.values)
+plt.xlim(2, 4.5)
+plt.ylim(-3, 3)
+for i, txt in enumerate(range(1, 5)):
+    plt.text(visit[i], like[i], txt)
+plt.xlabel("Mean Visit Frequency")
+plt.ylabel("Mean Like Score")
+plt.show()
